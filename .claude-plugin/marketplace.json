@@ -1,0 +1,13 @@
+{
+  "name": "vcu-internal-plugins",
+  "owner": { "name": "kuntae802" },
+  "description": "바이브코딩대학 운영진 내부 공부 도구 배포 채널.",
+  "plugins": [
+    {
+      "name": "internal-study",
+      "source": "./plugin/internal-study",
+      "description": "아카이브 자료로 과외식 공부 — MCP 연결·진도 기록",
+      "category": "productivity"
+    }
+  ]
+}

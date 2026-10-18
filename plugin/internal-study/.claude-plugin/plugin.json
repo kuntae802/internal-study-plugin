@@ -1,0 +1,22 @@
+{
+  "name": "internal-study",
+  "version": "0.1.6",
+  "description": "internal_study 아카이브 자료로 과외식 공부 — MCP 연결과 진도 기록",
+  "author": { "name": "kuntae802" },
+  "userConfig": {
+    "server_url": {
+      "type": "string",
+      "title": "internal_study MCP 주소",
+      "description": "lab 은 https://lab.vibecoding-univ.com/internal_study/mcp",
+      "default": "https://lab.vibecoding-univ.com/internal_study/mcp",
+      "required": true
+    },
+    "api_token": {
+      "type": "string",
+      "title": "MCP 토큰",
+      "description": "internal_study 내 설정에서 발급한 토큰",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "vcu-internal-plugins",
+  "interface": { "displayName": "VCU Internal Plugins" },
+  "plugins": [
+    {
+      "name": "internal-study",
+      "source": { "source": "local", "path": "./plugin/internal-study" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}
