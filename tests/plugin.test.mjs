@@ -144,10 +144,11 @@ test("서버 진도의 새 꼴(resume·창·잘린 기록·부 전체·자료 �
     "`item_title`",                                  // 자료 제목 칸
     "폴더에 없는 차시 <n>개는 가져오지 않았습니다",  // 가져오기 skipped
     "`data`를 고쳐 다시 부르지 않는다",
-    "상위 폴더로 올라가며",
+    "상위 폴더는 찾지 않는다",                         // 작업 폴더 밖 Read 는 허용 창(시범 실측)
     "`courses`",
   ];
   for (const s of MUST) assert.ok(skill.includes(s), `SKILL.md 에 없는 문장: ${s}`);
   assert.ok(practice.includes("`unit_offset`을 0·30·60…으로 넘겨 가며"), "practice.md builds_on 이 창 밖 차시를 찾지 않습니다");
   assert.ok(!skill.includes("`units`에서 `last_unit`의 차시를 찾는다"), "다음 할 곳이 아직 last_unit 으로 찾습니다");
+  assert.ok(!skill.includes("상위 폴더로 올라가며"), "예전 진도 파일을 상위 폴더까지 찾습니다(작업 폴더 밖 허용 창)");
 });
