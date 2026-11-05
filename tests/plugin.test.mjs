@@ -1,4 +1,4 @@
-// 플러그인 문장·설정 점검 — 저장소 루트에서 `node --test tests/*.test.mjs`.플러그인을 쓰는 데는 Node 가 필요 없다(고치는 사람만 돌린다).
+// 플러그인 문장·설정 점검 — 저장소 루트에서 `node --test tests/*.test.mjs`. 플러그인을 쓰는 데는 Node 가 필요 없다(고치는 사람만 돌린다).
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -36,6 +36,25 @@ function allowedTools(fm) {
   return out;
 }
 
+// 머리 칸 한 줄(`    - matcher: "…"`)의 YAML 큰따옴표 값을 푼다 — YAML 해석기가 없으니 줄을 정확히 읽고, 이스케이프는 JSON 문자열 규칙으로 푼다
+// (YAML 큰따옴표 이스케이프 가운데 JSON 과 같은 것만 쓴다는 약속 — 다른 이스케이프면 JSON.parse 가 던져 시험이 깨진다)
+function matcherRegex(fm) {
+  const lines = fm.split("\n").filter((l) => /^\s+- matcher: /.test(l));
+  assert.equal(lines.length, 1, "PreToolUse matcher 줄이 하나가 아닙니다");
+  const m = lines[0].match(/^\s+- matcher: ("(?:[^"\\]|\\.)*")$/);
+  assert.ok(m, "matcher 는 큰따옴표 한 값이어야 합니다");
+  return new RegExp(JSON.parse(m[1]));
+}
+
+// hook 의 args 줄(`args: ["%s", '<JSON>']`)에서 printf 가 그대로 내보낼 JSON 을 꺼낸다 — YAML 작은따옴표 안의 '' 는 ' 하나다
+function hookOutput(fm) {
+  const lines = fm.split("\n").filter((l) => /^\s+args: /.test(l));
+  assert.equal(lines.length, 1, "hook args 줄이 하나가 아닙니다");
+  const m = lines[0].match(/^\s+args: \["%s", '((?:[^']|'')*)'\]$/);
+  assert.ok(m, "args 는 [\"%s\", '<JSON>'] 꼴이어야 합니다");
+  return JSON.parse(m[1].replaceAll("''", "'"));
+}
+
 // 플러그인 도구 이름 앞부분 = mcp__plugin_<플러그인 이름>_<서버 이름>__ (manifest·.mcp.json 에서 만든다)
 function prefix() {
   const name = json(path.join(P, ".claude-plugin", "plugin.json")).name;
@@ -59,17 +78,17 @@ test("허용 도구 칸 = 읽기 8 + study_* 8, 플러그인 연결 이름 꼴",
 
 test("허용 hook 은 같은 16개 도구에만 걸리고 allow 를 낸다", () => {
   const fm = frontmatter(read(path.join(S, "SKILL.md")));
-  const m = fm.match(/matcher: "([^"]+)"/);
-  assert.ok(m, "PreToolUse matcher 가 없습니다");
-  const re = new RegExp(m[1]);
+  const re = matcherRegex(fm);
   for (const t of ALL) assert.ok(re.test(prefix() + t), `${t} 가 맞지 않습니다`);
-  for (const t of ["create_item", "submit_generated", "submit_outline", "submit_translation", "get_refine_brief", "get_translation_part"]) {
-    assert.ok(!re.test(prefix() + t), `${t} 까지 허용합니다`);
-  }
+  const BLOCKED = ["create_item", "submit_generated", "submit_outline", "submit_translation", "get_refine_brief", "get_translation_part",
+    "get_outline_brief", "get_translation_brief"];
+  for (const t of BLOCKED) assert.ok(!re.test(prefix() + t), `${t} 까지 허용합니다`);
   assert.ok(!re.test("mcp__internal-study__study_record"), "플러그인 밖 연결까지 허용합니다");
   assert.ok(fm.includes("PreToolUse:"));
-  assert.ok(fm.includes('"permissionDecision":"allow"'));
   assert.ok(fm.includes("command: printf"));
+  const out = hookOutput(fm).hookSpecificOutput;
+  assert.equal(out.hookEventName, "PreToolUse");
+  assert.equal(out.permissionDecision, "allow");
 });
 
 test("스킬 문서가 부르는 study_* 는 허용 칸의 8개뿐이고 8개 모두 문서에 나온다", () => {
@@ -108,4 +127,27 @@ test("기록 규칙의 핵심 문장이 있다", () => {
   for (const s of ["**기록은 말한 그대로 남긴다.**", "**말한 그대로 남긴다.**", "**기록은 진도가 아니다.**", "다시 볼 것 표시를 풀까요?", "공부는 이어 갑니다.", "메모로 남겼습니다 — "]) {
     assert.ok(skill.includes(s), `없는 문장: ${s}`);
   }
+});
+
+test("서버 진도의 새 꼴(resume·창·잘린 기록·부 전체·자료 제목·가져오기)을 문장이 쓴다", () => {
+  const skill = read(path.join(S, "SKILL.md"));
+  const practice = read(path.join(S, "practice.md"));
+  const MUST = [
+    "`resume`이 이어 갈 차시다",                    // 다음 할 곳 = 서버 resume(웹 '이어서 공부하기'와 같은 차시)
+    "`resume.stopped`",
+    "`counts.done == counts.total`",
+    "`unit_offset`을 0·30·60…으로 넘겨 가며",        // 창 밖 차시 찾기
+    "`unit_offset=<ord>`",
+    "`truncated: true`",                             // 잘린 다시 볼 것·메모
+    "같은 뜻의 질문을 새로 만들어",
+    "`p<부>`(예: `p2`)",                             // 부 차시 전체 기록
+    "`item_title`",                                  // 자료 제목 칸
+    "폴더에 없는 차시 <n>개는 가져오지 않았습니다",  // 가져오기 skipped
+    "`data`를 고쳐 다시 부르지 않는다",
+    "상위 폴더로 올라가며",
+    "`courses`",
+  ];
+  for (const s of MUST) assert.ok(skill.includes(s), `SKILL.md 에 없는 문장: ${s}`);
+  assert.ok(practice.includes("`unit_offset`을 0·30·60…으로 넘겨 가며"), "practice.md builds_on 이 창 밖 차시를 찾지 않습니다");
+  assert.ok(!skill.includes("`units`에서 `last_unit`의 차시를 찾는다"), "다음 할 곳이 아직 last_unit 으로 찾습니다");
 });
