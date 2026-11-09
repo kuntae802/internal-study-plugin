@@ -1,6 +1,6 @@
 {
   "name": "internal-study",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "internal_study 아카이브 자료로 과외식 공부 — MCP 연결과 진도 기록",
   "author": { "name": "kuntae802" },
   "userConfig": {
