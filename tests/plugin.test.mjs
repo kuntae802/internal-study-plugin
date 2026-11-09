@@ -154,3 +154,40 @@ test("서버 진도의 새 꼴(resume·창·잘린 기록·부 전체·자료 �
   assert.ok(!skill.includes("`units`에서 `last_unit`의 차시를 찾는다"), "다음 할 곳이 아직 last_unit 으로 찾습니다");
   assert.ok(!skill.includes("상위 폴더로 올라가며"), "예전 진도 파일을 상위 폴더까지 찾습니다(작업 폴더 밖 허용 창)");
 });
+
+test("한 응답 안의 순서 — 답은 한 번만 쓴다(기록 뒤 답 되풀이 금지)", () => {
+  // 공부 시범 실측(2026-11-09): 답 → study_record → 같은 답을 요약해 다시 써서 화면에 답이 두 번 나갔다(세 턴 연속).
+  const skill = read(path.join(S, "SKILL.md"));
+  const practice = read(path.join(S, "practice.md"));
+  for (const s of [
+    "**한 응답 안의 순서 — 답은 한 번만 쓴다.**",
+    "답보다 먼저 부른다",                              // 진도 쓰기·읽기는 앞
+    "학습 기록(`study_record`)은 응답 맨 끝에 부른다",
+    "기록이 돌아온 뒤에는 화면에 글을 더 내지 않는다", // '쓰기'(도구)와 헷갈리지 않게 '글'로
+    "학습 기록(`study_record`) 말고 이번 응답에서 부를 도구는 모두 답보다 먼저 부른다",
+    "그 줄에는 답·해설·맞고 틀림을 쓰지 않는다",       // 도구 앞 한 줄 알림에 평가를 넣으면 평가가 두 번 나간다
+    "그 구간을 마치는 응답에서 글보다 먼저 부른다",
+    "`question`은 사용자가 이번에 답한 질문이다",
+    "해설 뒤에 이어 쓴 다음 질문·다음 구간 설명·닫기 정리는 넣지 않는다", // 다음 글을 기록 앞에 쓰므로 explanation 에서 뗀다
+    "답 뒤에 이어 쓴 전달·다음 질문은 넣지 않는다",
+    "그 말 바로 앞 응답의 네 답이나 해설 그대로다",
+    "응답 맨 끝의 기록이 실패했으면 그 한 줄로 응답을 끝내고",
+    "이어 갈 글의 첫머리에 한 번 쓴다",               // 가져오기 알림
+    "**따로 묻거나 메모를 부탁한 응답은 그 답에서 끝낸다.**", // 이어 가면 되돌아보기·기록 경계가 한 응답에서 엉킨다(사용자 확정 11-10)
+    "같은 응답에서 다음 구간으로 넘어가지 않는다",
+  ]) assert.ok(skill.includes(s), `SKILL.md 에 없는 문장: ${s}`);
+  const modes = read(path.join(S, "modes.md"));
+  assert.ok(!skill.includes("바로 따르고, `study_set_mode"), "SKILL.md 모드 바꾸기가 아직 글 뒤에 진도를 씁니다");
+  assert.ok(!modes.includes("바로 따르고 `study_set_mode"), "modes.md 모드 바꾸기가 아직 글 뒤에 진도를 씁니다");
+  assert.ok(modes.includes("그 응답에서 글보다 먼저 `study_set_mode"), "modes.md 모드 바꾸기에 순서 문장이 없습니다");
+  assert.ok(practice.includes("남기는 응답에서 글보다 먼저 부른다"), "practice.md 실습 진도에 순서 문장이 없습니다");
+  assert.ok(practice.includes("끝나는 응답에서 글보다 먼저 `done`이나 `changed`"), "건너뛴 실습 다시 하기에 순서 문장이 없습니다");
+  const open = skill.indexOf('`study_set_unit(<차시 id>, "doing")`을 먼저 부른다');
+  const last = skill.indexOf("- 지난 위치를 확인한다.");
+  assert.ok(open > 0 && open < last, "열기에서 doing 쓰기가 말하기보다 뒤에 있습니다");
+  assert.ok(!skill.includes("다음 질문으로 가기 전에 그 문답을"), "확인 단계가 아직 기록 뒤에 다음 질문을 씁니다");
+  const done = skill.indexOf('`study_set_unit(<차시 id>, "done")`을 먼저 부른다');
+  const sum = skill.indexOf("이 차시를 두세 줄로 정리한다");
+  assert.ok(done > 0 && done < sum, "닫기에서 done 쓰기가 정리 글보다 뒤에 있습니다");
+  assert.ok(!practice.includes("바로 넘어가고 `study_set_practice"), "건너뜀 기록이 아직 글 뒤에 진도를 씁니다");
+});
